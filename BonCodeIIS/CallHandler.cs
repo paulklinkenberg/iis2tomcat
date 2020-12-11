@@ -125,6 +125,34 @@ namespace BonCodeIIS
                         BonCodeAJP13Settings.BonCodeAjp13_DocRoot = System.Web.HttpContext.Current.Server.MapPath("~");
                     }
 
+
+
+                    // Check if the Ajp13_DocRoot contains a custom settings file, if we are currently in "global mode"
+                    if (usingGlobalMode()) {
+                        p_localSettingsFileName = BonCodeAJP13Settings.BonCodeAjp13_DocRoot + "\\BIN\\BonCodeAJP13.settings";
+                        if (File.Exists(p_localSettingsFileName)){
+                            try {
+                                // read the settings file
+                                XmlDocument doc = new XmlDocument();
+                                doc.Load(p_localSettingsFileName);
+
+                                _updateSettingWhenInXMLDoc(doc, "Server", "BONCODEAJP13_SERVER");
+                                _updateSettingWhenInXMLDoc(doc, "Port", "BONCODEAJP13_PORT");
+                                _updateSettingWhenInXMLDoc(doc, "EnableRemoteAdmin", "BONCODEAJP13_ENABLE_REMOTE_MANAGER");
+                                _updateSettingWhenInXMLDoc(doc, "EnableHeaderDataSupport", "BONCODEAJP13_HEADER_SUPPORT");
+                                _updateSettingWhenInXMLDoc(doc, "ForceSecureSession", "BONCODEAJP13_FORCE_SECURE_SESSION");
+                                _updateSettingWhenInXMLDoc(doc, "AllowEmptyHeaders", "BONCODEAJP13_ALLOW_EMTPY_HEADERS");
+                                _updateSettingWhenInXMLDoc(doc, "ResolveRemoteAddrFrom", "BONCODEAJP13_REMOTEADDR_FROM");
+                                _updateSettingWhenInXMLDoc(doc, "ModCFMLSecret", "BONCODE_MODCFML_SECRET");
+                                // and many others ... See BonCodeAJP13Settings in BonCodeAJP13Enum.cs
+                            }
+                            catch (Exception)
+                            {
+                                RecordSysEvent("Trying to xml-read settings file [" + p_customSettingsFileName + "] resulted in an error: " + exp.Message, EventLogEntryType.Warning);
+                            }
+                        }
+                    }
+                    
                     
                     //in some circumstances invalid path data can be supplied by client if so we will set the path to blank when exception occurs, e.g. http://project/group:master...master
                     try
@@ -380,6 +408,40 @@ namespace BonCodeIIS
         }
 
        
+
+        /// <summary>
+        /// Checks if we are within Global Assembly Cache (using "global mode": 1 setup for all sites)
+        /// </summary>
+        public static bool usingGlobalMode()
+        {
+            try
+            {
+                // https://stackoverflow.com/a/11368865
+                testAssembly = Assembly.LoadFrom("BonCodeAJP13.dll");
+                return testAssembly.GlobalAssemblyCache;
+            }
+            catch
+            {
+                return true;// By default, expect global mode
+            }
+        }
+
+
+        /// <summary>
+        /// Checks the given xml document to see if it contains a node+nodeValue. If so, updates the settings file
+        /// </summary>
+        void _updateSettingWhenInXMLDoc(XmlDocument doc, String nodeName, String settingName)
+        {
+            XmlNode node = doc.DocumentElement.SelectSingleNode("/Settings/"+nodeName);
+            if (node != null) {
+                String settingValue = node.innerText;
+                if (settingValue != null && settingValue != "") {
+                    BonCodeAJP13Settings[settingName] = settingValue;
+                }
+            }
+        }
+
+
 
         /// <summary>
         /// Return the mapping of or URi to physical server path, including virtual directories etc.
